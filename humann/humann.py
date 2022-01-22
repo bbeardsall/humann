@@ -718,16 +718,16 @@ def check_requirements(args):
         if not config.bypass_nucleotide_index:
             valid_format_count=0
             for file in os.listdir(config.nucleotide_database):
-                # expect most of the file names to be of the format g__*s__*
-                if re.search("^[g__][s__]",file): 
+                # expect most of the file names to be of the format SGB
+                if re.search("^SGB",file): 
                     valid_format_count+=1
-                if not config.metaphlan_3p0_db_matching_uniref in file:
+                if not config.metaphlan_4p0_db_matching_uniref in file:
                     sys.exit("\n\nCRITICAL ERROR: The directory provided for ChocoPhlAn contains files ( "+file+" )"+\
                         " that are not of the expected version. Please install the latest version"+\
-                        " of the database: "+config.metaphlan_3p0_db_matching_uniref)
+                        " of the database: "+config.metaphlan_4p0_db_matching_uniref)
             if valid_format_count == 0:
                 sys.exit("CRITICAL ERROR: The directory provided for ChocoPhlAn does not "
-                    + "contain files of the expected format (ie \'^[g__][s__]\').")
+                    + "contain files of the expected format (ie \'^SGB\').")
                 
         # Check if running with the demo database
         if not config.bypass_nucleotide_index:
@@ -789,10 +789,10 @@ def check_requirements(args):
             database_files=os.listdir(config.protein_database)
             valid_format_database_files=[]
             for file in database_files:
-                if not config.metaphlan_3p0_db_matching_uniref in file:
+                if not config.metaphlan_4p0_db_matching_uniref in file:
                     sys.exit("\n\nCRITICAL ERROR: The directory provided for the translated database contains files ( "+file+" )"+\
                         " that are not of the expected version. Please install the latest version"+\
-                        " of the database: "+config.metaphlan_3p0_db_matching_uniref)
+                        " of the database: "+config.metaphlan_4p0_db_matching_uniref)
                 
                 if file.endswith(expected_database_extension):
                     # if rapsearch check for the second database file

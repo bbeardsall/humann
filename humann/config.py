@@ -357,12 +357,12 @@ genefamilies_file="_genefamilies"
 metaphlan_opts=["-t","rel_ab"]
 metaphlan_version={
     "flag" : "--version",
-    "major" : 3,
-    "minor" : 0,
+    "major" : 4,
+    "minor" : 2,
     "line" : -1,
     "column" : 2}
-metaphlan_3p0_db_version="v30"
-metaphlan_3p0_db_matching_uniref="201901b"
+metaphlan_4p0_db_version="vJan21"
+metaphlan_4p0_db_matching_uniref="SGB"
 
 # chocophlan formatting
 chocophlan_delimiter="|"
