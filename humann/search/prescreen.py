@@ -87,12 +87,8 @@ def create_custom_database(chocophlan_dir, bug_file):
             if line.startswith("#") and config.metaphlan_4p0_db_version in line:
                 version_found = True
 
-            # if we see taxon-level we are done processing
+            # search for the lines that have the sgb-level information
             if re.search("t__", line):
-                break
- 
-            # search for the lines that have the species-level information
-            if re.search("s__", line):
                 # check threshold
                 try:
                     data=line.split("\t")
@@ -108,21 +104,22 @@ def create_custom_database(chocophlan_dir, bug_file):
                 if read_percent >= config.prescreen_threshold:
                     total_reads_covered += read_percent
                     organism_info=line.split("\t")[0]
-                    # use the genus and species
+                    # use the genus and species and SGB
                     try:
-                        species=organism_info.split("|")[-1]
-                        genus=organism_info.split("|")[-2]
+                        sgb=organism_info.split("|")[-1]
+                        species=organism_info.split("|")[-2]
+                        genus=organism_info.split("|")[-3]
                     except IndexError:
+                        sgb=""
                         species=""
                         genus=""
                         logger.debug("Unable to process species: " + line)
                         
-                    if species and genus:
-                        message=("Found " + genus + "." + species + " : " +
+                    if species and genus and sgb:
+                        message=("Found " + genus + "." + species + "." + sgb + " : " +
                             "{:.2f}".format(read_percent) + "% of mapped reads")
                         logger.info(message)
-                        print(message)
-                        species_found.append(genus + "." + species)
+                        species_found.append(genus + "." + species + "." + sgb)
 
             line = file_handle.readline()
    
@@ -142,19 +139,21 @@ def create_custom_database(chocophlan_dir, bug_file):
         print(message+"\n")
 
     # identify the files to be used from the ChocoPhlAn database
-    species_file_list = []
+    species_file_set = set()
     if not config.bypass_prescreen:
         for species_file in os.listdir(chocophlan_dir):
             for species in species_found:
-                # match the exact genus and species from the MetaPhlAn (or custom) list
-                if re.search(species.lower()+"\.", species_file.lower()): 
-                    species_file_list.append(os.path.join(chocophlan_dir,species_file))
+                # match the sgb for the species identified
+                search_sgb=species.lower().split(".")[-1].split("_")[2]+"_"
+                if re.search(search_sgb, species_file.lower()): 
+                    species_file_set.add(os.path.join(chocophlan_dir,species_file))
                     logger.debug("Adding file to database: " + species_file)   
     else:
         for species_file in os.listdir(chocophlan_dir):
-            species_file_list.append(os.path.join(chocophlan_dir,species_file))
+            species_file_set.add(os.path.join(chocophlan_dir,species_file))
             logger.debug("Adding file to database: " + species_file)   
 
+    species_file_list = list(species_file_set)
 
     # create new fasta file containing only those species found
     if not species_file_list:
@@ -182,6 +181,9 @@ def create_custom_database(chocophlan_dir, bug_file):
         args=[]
         if ext == ".gz":
             exe="gunzip"
+            args=["-c"]
+        elif ext == ".bz2":
+            exe="bunzip2"
             args=["-c"]
         
         # check if set to bypass this step
