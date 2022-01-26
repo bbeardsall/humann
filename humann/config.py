@@ -354,7 +354,7 @@ pathcoverage_file="_pathcoverage"
 genefamilies_file="_genefamilies"
 
 # metaphlan options
-metaphlan_opts=["-t","rel_ab"]
+metaphlan_opts=["--sgb"]
 metaphlan_version={
     "flag" : "--version",
     "major" : 4,
