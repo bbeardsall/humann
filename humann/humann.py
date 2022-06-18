@@ -152,6 +152,10 @@ def parse_arguments(args):
         help="additional output is printed\n", 
         action="store_true",
         default=config.verbose)
+    workflow_refinement.add_argument(
+        "--bypass-pathway-coverage",
+        action="store_true"
+    )
 
     tier1_prescreen=parser.add_argument_group("[2] Configure tier 1: prescreen")
 
@@ -937,23 +941,24 @@ def main():
     # If id mapping is provided then process
     if args.id_mapping:
         alignments.process_id_mapping(args.id_mapping)
-    
-    # Load in the reactions database
-    reactions_database=None
-    if config.pathways_database_part1:
-        reactions_database=store.ReactionsDatabase(config.pathways_database_part1)
-    
-        message="Load pathways database part 1: " + config.pathways_database_part1
+        
+    if not args.bypass_pathway_coverage:
+        # Load in the reactions database
+        reactions_database=None
+        if config.pathways_database_part1:
+            reactions_database=store.ReactionsDatabase(config.pathways_database_part1)
+
+            message="Load pathways database part 1: " + config.pathways_database_part1
+            logger.info(message)
+
+        # Load in the pathways database
+        pathways_database=store.PathwaysDatabase(config.pathways_database_part2, reactions_database)
+
+        if config.pathways_database_part1:
+            message="Load pathways database part 2: " + config.pathways_database_part2
+        else:
+            message="Load pathways database: " + config.pathways_database_part2
         logger.info(message)
-    
-    # Load in the pathways database
-    pathways_database=store.PathwaysDatabase(config.pathways_database_part2, reactions_database)
-    
-    if config.pathways_database_part1:
-        message="Load pathways database part 2: " + config.pathways_database_part2
-    else:
-        message="Load pathways database: " + config.pathways_database_part2
-    logger.info(message)
 
     # Start timer
     start_time=time.time()
@@ -1124,21 +1129,21 @@ def main():
         
     # Clear all of the alignments data as they are no longer needed
     alignments.clear()
-    
-    # Identify reactions and then pathways from the alignments
-    message="Computing pathways abundance and coverage ..."
-    logger.info(message)
-    print("\n"+message)
-    pathways_and_reactions_store=modules.identify_reactions_and_pathways(
-        gene_scores, reactions_database, pathways_database)
+    if not args.bypass_pathway_coverage:
+        # Identify reactions and then pathways from the alignments
+        message="Computing pathways abundance and coverage ..."
+        logger.info(message)
+        print("\n"+message)
+        pathways_and_reactions_store=modules.identify_reactions_and_pathways(
+            gene_scores, reactions_database, pathways_database)
 
-    # Compute pathway abundance and coverage
-    abundance_file, coverage_file=modules.compute_pathways_abundance_and_coverage(
-        gene_scores, reactions_database, pathways_and_reactions_store, pathways_database, unaligned_reads_count)
-    output_files.append(abundance_file)
-    output_files.append(coverage_file)
+        # Compute pathway abundance and coverage
+        abundance_file, coverage_file=modules.compute_pathways_abundance_and_coverage(
+            gene_scores, reactions_database, pathways_and_reactions_store, pathways_database, unaligned_reads_count)
+        output_files.append(abundance_file)
+        output_files.append(coverage_file)
 
-    start_time=timestamp_message("computing pathways",start_time)
+        start_time=timestamp_message("computing pathways",start_time)
 
     message="\nOutput files created: \n" + "\n".join(output_files) + "\n"
     logger.info(message)
