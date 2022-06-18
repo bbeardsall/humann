@@ -156,6 +156,10 @@ def parse_arguments(args):
         "--bypass-pathway-coverage",
         action="store_true"
     )
+    workflow_refinement.add_argument(
+        "--bypass-gene-families",
+        action="store_true"
+    )
 
     tier1_prescreen=parser.add_argument_group("[2] Configure tier 1: prescreen")
 
@@ -1102,7 +1106,7 @@ def main():
         
     # Compute or load in gene families
     output_files=[]
-    if args.input_format in ["fasta","fastq","sam","blastm8"]:
+    if (args.input_format in ["fasta","fastq","sam","blastm8"]) and (not args.bypass_gene_families):
         # Compute the gene families
         message="Computing gene families ..."
         logger.info(message)
