@@ -1,1 +1,4 @@
 humann/data/
+build/
+humann.egg-info/
+humann/quantify/MinPath/

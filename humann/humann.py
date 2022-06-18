@@ -160,6 +160,10 @@ def parse_arguments(args):
         "--bypass-gene-families",
         action="store_true"
     )
+    workflow_refinement.add_argument(
+        "--existing-diamond-alignment-file"
+    )
+
 
     tier1_prescreen=parser.add_argument_group("[2] Configure tier 1: prescreen")
 
@@ -944,8 +948,10 @@ def main():
     
     # If id mapping is provided then process
     if args.id_mapping:
+        message="Process id mapping..."
+        logger.info(message)
         alignments.process_id_mapping(args.id_mapping)
-        
+
     if not args.bypass_pathway_coverage:
         # Load in the reactions database
         reactions_database=None
@@ -1084,26 +1090,56 @@ def main():
             args.input, alignments, unaligned_reads_store, keep_sam=True)
 
         # Print out total alignments per bug
-            message="Total bugs from nucleotide alignment: " + str(alignments.count_bugs())
+        message="Total bugs from nucleotide alignment: " + str(alignments.count_bugs())
+        logger.info(message)
+        print(message)
+        
+        message=alignments.counts_by_bug()
+        logger.info("\n"+message)
+        print(message)        
+
+        message="Total gene families from nucleotide alignment: " + str(alignments.count_genes())
+        logger.info(message)
+        print("\n"+message)
+
+        # Report reads unaligned
+        message="Unaligned reads after nucleotide alignment: " + utilities.estimate_unaligned_reads_stored(
+            args.input, unaligned_reads_store) + " %"
+        logger.info(message)
+        print("\n"+message+"\n")  
+        
+        start_time=timestamp_message("alignment post-processing",start_time)
+
+        # Read in existing diamond alignment tsv file
+        if args.existing_diamond_alignment_file:
+            message="Process existing diamond alignment file..."
+            logger.info(message)
+            print("\n"+message)
+            
+            translated_unaligned_reads_file_fastq = translated.unaligned_reads(
+            unaligned_reads_store, args.existing_diamond_alignment_file, alignments)
+
+            # Print out total alignments per bug
+            message="Total bugs after translated alignment: " + str(alignments.count_bugs())
             logger.info(message)
             print(message)
-            
+        
             message=alignments.counts_by_bug()
             logger.info("\n"+message)
-            print(message)        
+            print(message)
     
-            message="Total gene families from nucleotide alignment: " + str(alignments.count_genes())
+            message="Total gene families after translated alignment: " + str(alignments.count_genes())
             logger.info(message)
             print("\n"+message)
     
             # Report reads unaligned
-            message="Unaligned reads after nucleotide alignment: " + utilities.estimate_unaligned_reads_stored(
+            message="Unaligned reads after translated alignment: " + utilities.estimate_unaligned_reads_stored(
                 args.input, unaligned_reads_store) + " %"
             logger.info(message)
-            print("\n"+message+"\n")  
-        
-        start_time=timestamp_message("alignment post-processing",start_time)
-            
+            print("\n"+message+"\n")
+
+            start_time=timestamp_message("alignment post-processing",start_time)
+
     # Process input files of tab-delimited blast format
     elif args.input_format in ["blastm8"]:
         
