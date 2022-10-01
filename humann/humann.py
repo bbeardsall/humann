@@ -163,6 +163,10 @@ def parse_arguments(args):
     workflow_refinement.add_argument(
         "--existing-diamond-alignment-file"
     )
+    workflow_refinement.add_argument(
+    "--bypass-nucleotide-unaligned-write",
+    action="store_true"
+    )
 
 
     tier1_prescreen=parser.add_argument_group("[2] Configure tier 1: prescreen")
@@ -1087,7 +1091,8 @@ def main():
         print("\n"+message)
             
         [unaligned_reads_file_fasta, reduced_aligned_reads_file] = nucleotide.unaligned_reads(
-            args.input, alignments, unaligned_reads_store, keep_sam=True)
+            args.input, alignments, unaligned_reads_store, keep_sam=True, 
+            bypass_nucleotide_unaligned_write = args.bypass_nucleotide_unaligned_write)
 
         # Print out total alignments per bug
         message="Total bugs from nucleotide alignment: " + str(alignments.count_bugs())

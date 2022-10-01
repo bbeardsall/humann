@@ -220,7 +220,8 @@ def find_md_field(info):
         
     return md_field
 
-def unaligned_reads(sam_alignment_file, alignments, unaligned_reads_store, keep_sam=None):
+def unaligned_reads(sam_alignment_file, alignments, unaligned_reads_store, keep_sam=None,
+bypass_nucleotide_unaligned_write = False):
     """ 
     Return file and data structure of the unaligned reads 
     Store the alignments and return
@@ -293,7 +294,8 @@ def unaligned_reads(sam_alignment_file, alignments, unaligned_reads_store, keep_
         identity_threshold = config.nucleotide_identity_threshold)
 
     file_handle_read=open(sam_alignment_file, "rt")
-    file_handle_write_unaligned=open(unaligned_reads_file_fasta, "w")
+    if not bypass_nucleotide_unaligned_write:
+        file_handle_write_unaligned=open(unaligned_reads_file_fasta, "w")
 
     # read through the file line by line
     # capture alignments and also write out unaligned reads for next step in processing
@@ -347,8 +349,9 @@ def unaligned_reads(sam_alignment_file, alignments, unaligned_reads_store, keep_
             if unaligned_read:
                 annotated_sam_read_name=utilities.add_length_annotation(info[config.sam_read_name_index],
                                                                     len(info[config.sam_read_index]))
-                file_handle_write_unaligned.write(">"+annotated_sam_read_name+"\n")
-                file_handle_write_unaligned.write(info[config.sam_read_index]+"\n")
+                if not bypass_nucleotide_unaligned_write:
+                    file_handle_write_unaligned.write(">"+annotated_sam_read_name+"\n")
+                    file_handle_write_unaligned.write(info[config.sam_read_index]+"\n")
                 
                 # find the frames for the sequence and write to file
                 if write_picked_frames:
@@ -356,9 +359,10 @@ def unaligned_reads(sam_alignment_file, alignments, unaligned_reads_store, keep_
                     if not picked_frames:
                         no_frames_found_count+=1
                     for frame in picked_frames:
-                        file_handle_write_unaligned_frames.write(">"+
-                            annotated_sam_read_name+"\n")
-                        file_handle_write_unaligned_frames.write(frame+"\n")
+                        if not bypass_nucleotide_unaligned_write:
+                            file_handle_write_unaligned_frames.write(">"+
+                                annotated_sam_read_name+"\n")
+                            file_handle_write_unaligned_frames.write(frame+"\n")
                 
                 # store the unaligned reads data
                 unaligned_reads_store.add(info[config.sam_read_name_index], 
@@ -376,7 +380,8 @@ def unaligned_reads(sam_alignment_file, alignments, unaligned_reads_store, keep_
         str(query_coverage_count))
     
     file_handle_read.close()
-    file_handle_write_unaligned.close()   
+    if not bypass_nucleotide_unaligned_write:
+        file_handle_write_unaligned.close()   
     file_handle_write_aligned.close()
     
     # set the total number of queries
