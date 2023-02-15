@@ -22,7 +22,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
-
+import tqdm
 import os 
 import sys
 import subprocess
@@ -867,16 +867,14 @@ def estimate_unaligned_reads(input_fastq, unaligned_fastq):
 
     return format_float_to_string(percent)
 
-def estimate_unaligned_reads_stored(input_fastq, unaligned_store):
+def estimate_unaligned_reads_stored(total_reads, unaligned_store):
     """
     Calculate an estimate of the percent of reads unaligned and stored
     """
 
     # check if the total number of reads from the input file is stored
     if not unaligned_store.get_initial_read_count():
-        # check files exist and are readable
-        file_exists_readable(input_fastq)
-        unaligned_store.set_initial_read_count(count_reads(input_fastq))
+        unaligned_store.set_initial_read_count(total_reads)
 
     percent=unaligned_store.count_reads()/float(unaligned_store.get_initial_read_count()) * 100
 
@@ -1316,7 +1314,7 @@ def get_filtered_translated_alignments(alignment_file_tsv, alignments, apply_fil
     evalue_convert_error=0
     rapsearch_evalue_convert_error=0
     while line:
-        if re.search("^#",line):
+        if line.startswith("#"):# re.search("^#",line):
             # Check for the rapsearch2 header to determine if these are log(e-value)
             if re.search(config.blast_delimiter,line):
                 data=line.split(config.blast_delimiter)

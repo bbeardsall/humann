@@ -34,7 +34,8 @@ import math
 import sys
 import gzip
 import bz2
-
+import pickle
+import tqdm
 from . import config
 from . import utilities
 
@@ -50,41 +51,58 @@ def store_id_mapping(file):
 
     # Check the file exists and is readable
     utilities.file_exists_readable(file)
-         
-    file_handle=open(file,"rt")
-         
-    line=file_handle.readline()
-    while line:
-        # Ignore comment lines
-        if not re.search(config.id_mapping_comment_indicator,line):
-            data=line.rstrip().split(config.id_mapping_delimiter) 
-            # set the default values for the mapping
-            reference=""
-            gene=""
-            length=0
-            bug="unclassified"
-            try:
-                reference=data[config.id_mapping_reference_index]
-                gene=data[config.id_mapping_gene_index]
-                length=data[config.id_mapping_gene_length_index]
-                bug=data[config.id_mapping_bug_index]  
-            except IndexError:
-                pass
-                # logger.debug("Unable to read full mapping for id")
-                    
-            try:
-                length=int(length)
-            except ValueError:
-                length=0
-                    
-            # if the reference and gene are found, store the mapping
-            if reference and gene:
-                id_mapping[reference]=[gene,length,bug]
-                
+
+    # Load pickle file if available
+    pkl_filepath = file + ".pkl"
+    if os.path.exists(pkl_filepath):
+        print(f'loading pickled id mapping at {pkl_filepath}')
+        print(pkl_filepath)
+        with open(pkl_filepath, 'rb') as pickle_in:
+            id_mapping = pickle.load(pickle_in)
+    else:
+        file_handle=open(file,"rt")
+        print('reading idmapping...')
         line=file_handle.readline()
+        with tqdm.tqdm() as pbar:
+            while line:
+                # Ignore comment lines
+                # if not re.search(config.id_mapping_comment_indicator,line):
+                # if not line.startswith("#"):
+                data=line.rstrip().split(config.id_mapping_delimiter) 
+                # set the default values for the mapping
+                # reference=""
+                # gene=""
+                # length=0
+                # bug="unclassified"
+                reference=data[0]
+                length=data[1]
+                # try:
+                #     reference=data[config.id_mapping_reference_index]
+                #     gene=data[config.id_mapping_gene_index]
+                #     length=data[config.id_mapping_gene_length_index]
+                #     bug=data[config.id_mapping_bug_index]  
+                # except IndexError:
+                #     pass
+                #     # logger.debug("Unable to read full mapping for id")
+                
+                # if reference and gene:       
+                # # if the reference and gene are found, store the mapping 
+                #     try:
+                #         length=int(length)
+                #     except ValueError:
+                #         length=0
+                
+                id_mapping[reference]=length
         
-    file_handle.close() 
-    
+                line=file_handle.readline()
+                pbar.update()
+                
+        file_handle.close()
+
+        print('pickling id mapping...')
+        with open(pkl_filepath, 'wb') as pickle_out:
+            pickle.dump(id_mapping, pickle_out)
+        
     return id_mapping 
 
 def normalized_gene_length(gene_length, read_length):
@@ -236,7 +254,8 @@ class Alignments:
         gene=""
         if self.__id_mapping:
             if reference in self.__id_mapping:
-                [gene,length,bug]=self.__id_mapping[reference]
+                
+                [gene,length,bug]=reference, int(self.__id_mapping[reference]),'unclassified'
                 
         # if id mapping is not provided or not found for the reference then
         # try to process the reference string

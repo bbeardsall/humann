@@ -32,7 +32,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
-
 import sys
     
 # Try to load one of the humann modules to check the installation
@@ -44,7 +43,7 @@ except ImportError:
 
 # Check the python version
 check.python_version()
-    
+
 import argparse
 import subprocess
 import os
@@ -673,20 +672,20 @@ def check_requirements(args):
                 sys.exit("CRITICAL ERROR: Unable to remove spaces from identifiers in input file.")
             
     # If the input format is in binary then convert to sam (tab-delimited text)
-    if args.input_format == "bam":
+    # if args.input_format == "bam":
         
-        # Check for the samtools software
-        if not utilities.find_exe_in_path("samtools"):
-            sys.exit("CRITICAL ERROR: The samtools executable can not be found. "
-            "Please check the install or select another input format.")
+    #     # Check for the samtools software
+    #     if not utilities.find_exe_in_path("samtools"):
+    #         sys.exit("CRITICAL ERROR: The samtools executable can not be found. "
+    #         "Please check the install or select another input format.")
         
-        new_file=utilities.bam_to_sam(args.input)
+    #     new_file=utilities.bam_to_sam(args.input)
         
-        if new_file:
-            args.input=new_file
-            args.input_format="sam"
-        else:
-            sys.exit("CRITICAL ERROR: Unable to convert bam input file to sam.")
+    #     if new_file:
+    #         args.input=new_file
+    #         args.input_format="sam"
+    #     else:
+    #         sys.exit("CRITICAL ERROR: Unable to convert bam input file to sam.")
 
     # If the input format is in biom then convert to tsv
     if args.input_format == "biom":
@@ -949,12 +948,16 @@ def main():
     alignments=store.Alignments(minimize_memory_use=minimize_memory_use)
     unaligned_reads_store=store.Reads(minimize_memory_use=minimize_memory_use)
     gene_scores=store.GeneScores()
+
+    # Start timer
+    start_time=time.time()
     
     # If id mapping is provided then process
     if args.id_mapping:
         message="Process id mapping..."
         logger.info(message)
         alignments.process_id_mapping(args.id_mapping)
+        start_time=timestamp_message("process id mapping",start_time)
 
     if not args.bypass_pathway_coverage:
         # Load in the reactions database
@@ -973,6 +976,7 @@ def main():
         else:
             message="Load pathways database: " + config.pathways_database_part2
         logger.info(message)
+        start_time=timestamp_message("load pathways",start_time)
 
     # Start timer
     start_time=time.time()
@@ -1083,14 +1087,14 @@ def main():
             print(message)
     
     # Process input files of sam format
-    elif args.input_format in ["sam"]:
+    elif args.input_format in ["sam", "bam"]:
         
         # Store the sam mapping results
         message="Process the sam mapping results ..."
         logger.info(message)
         print("\n"+message)
             
-        [unaligned_reads_file_fasta, reduced_aligned_reads_file] = nucleotide.unaligned_reads(
+        [unaligned_reads_file_fasta, reduced_aligned_reads_file, percent_unaligned, total_reads] = nucleotide.unaligned_reads(
             args.input, alignments, unaligned_reads_store, keep_sam=True, 
             bypass_nucleotide_unaligned_write = args.bypass_nucleotide_unaligned_write)
 
@@ -1109,7 +1113,7 @@ def main():
 
         # Report reads unaligned
         message="Unaligned reads after nucleotide alignment: " + utilities.estimate_unaligned_reads_stored(
-            args.input, unaligned_reads_store) + " %"
+                total_reads, unaligned_reads_store) + " %"
         logger.info(message)
         print("\n"+message+"\n")  
         
@@ -1139,7 +1143,7 @@ def main():
     
             # Report reads unaligned
             message="Unaligned reads after translated alignment: " + utilities.estimate_unaligned_reads_stored(
-                args.input, unaligned_reads_store) + " %"
+                total_reads, unaligned_reads_store) + " %"
             logger.info(message)
             print("\n"+message+"\n")
 
@@ -1166,7 +1170,7 @@ def main():
         
     # Compute or load in gene families
     output_files=[]
-    if (args.input_format in ["fasta","fastq","sam","blastm8"]) and (not args.bypass_gene_families):
+    if (args.input_format in ["fasta","fastq","sam","bam","blastm8"]) and (not args.bypass_gene_families):
         # Compute the gene families
         message="Computing gene families ..."
         logger.info(message)
@@ -1220,3 +1224,5 @@ def main():
     if args.remove_temp_output:
         utilities.remove_directory(config.temp_dir)
         
+if __name__ == "__main__":
+    main()
