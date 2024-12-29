@@ -29,6 +29,7 @@ import numbers
 import logging
 import math
 import traceback
+from pathlib import Path
 
 from .. import utilities
 from .. import config
@@ -37,6 +38,8 @@ from ..search import blastx_coverage
 
 # name global logging instance
 logger=logging.getLogger(__name__)
+
+DIAMOND_SUFFIXES = [".1", ".2", ".1_unp", ".2_unp"]
 
 def usearch_alignment(alignment_file, uniref, unaligned_reads_file_fasta):
     """
@@ -267,7 +270,7 @@ def alignment(uniref, unaligned_reads_file):
 
     return alignment_file
 
-def unaligned_reads(unaligned_reads_store, alignment_file_tsv, alignments):
+def unaligned_reads(unaligned_reads_store, alignment_file_tsv, alignments, nucleotide_aligned_query_names):
     """
     Create a fasta file of the unaligned reads
     Store the alignment results
@@ -285,39 +288,50 @@ def unaligned_reads(unaligned_reads_store, alignment_file_tsv, alignments):
         logger.critical(message)
         print(message)
         return unaligned_file_fasta
-        
+    
+    tsv_path = Path(alignment_file_tsv)
+    tsv_path.parent / (tsv_path.stem.split('.')[0] + ".1" + tsv_path.suffix) 
+    alignment_files = [str(tsv_path.parent / (tsv_path.stem.split('.')[0] + suffix + tsv_path.suffix))
+                       for suffix in DIAMOND_SUFFIXES]
     # get the list of proteins from the alignment that meet the coverage threshold
-    allowed_proteins = blastx_coverage.blastx_coverage(alignment_file_tsv,
+    allowed_proteins = blastx_coverage.blastx_coverage(alignment_files,
         config.translated_subject_coverage_threshold, alignments, log_messages=True, apply_filter=True,
         query_coverage_threshold=config.translated_query_coverage_threshold,
         identity_threshold = config.identity_threshold)
 
     # run through final filter of alignment by allowed proteins
     small_coverage_count=0
-    for alignment_info in utilities.get_filtered_translated_alignments(alignment_file_tsv, alignments,
-                                                  apply_filter=True, log_filter=True, identity_threshold=config.identity_threshold):
-        (protein_name, gene_length, queryid, matches, bug, alignment_length,
-         subject_start_index, subject_stop_index) = alignment_info
-        # check the protein matches one allowed
-        if protein_name in allowed_proteins:
-            # if matches allowed, then add alignment
-            alignments.add(protein_name, gene_length, queryid, matches, 
-                           bug, alignment_length)
-                        
-            # remove the id of the alignment from the unaligned reads store
-            unaligned_reads_store.remove_id(queryid)
-        else:
-            small_coverage_count+=1
+    aligned_queries = set()
+    for alignment_file_tsv in alignment_files:
+        for alignment_info in utilities.get_filtered_translated_alignments(alignment_file_tsv, alignments,
+                                                    apply_filter=True, log_filter=True, identity_threshold=config.identity_threshold):
+            (protein_name, gene_length, queryid, matches, bug, alignment_length,
+            subject_start_index, subject_stop_index) = alignment_info
+            # check the protein matches one allowed
+            if protein_name in allowed_proteins:
+                # if matches allowed, then add alignment
+                alignments.add(protein_name, gene_length, queryid, matches, 
+                            bug, alignment_length)
+                            
+                # remove the id of the alignment from the unaligned reads store
+                unaligned_reads_store.remove_id(queryid)
+                aligned_queries.add(queryid)
+            else:
+                small_coverage_count+=1
+                # if queryid not in nucleotide_aligned_query_names:
+                #     # add the id of the alignment to the unaligned reads store
+                #     unaligned_reads_store.add(queryid, 'AAA')
+
 
     logger.debug("Total translated alignments not included based on small subject coverage value: " + 
         str(small_coverage_count))
 
     # create unaligned file using list of remaining unaligned stored data
-    file_handle_write=open(unaligned_file_fasta,"w")
-    for fasta_line in unaligned_reads_store.get_fasta():
-        file_handle_write.write(fasta_line+"\n")
-    file_handle_write.close()
+    # file_handle_write=open(unaligned_file_fasta,"w")
+    # for fasta_line in unaligned_reads_store.get_fasta():
+    #     file_handle_write.write(fasta_line+"\n")
+    # file_handle_write.close()
 
-    return unaligned_file_fasta
+    return unaligned_file_fasta, aligned_queries
 
 

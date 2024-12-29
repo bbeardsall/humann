@@ -44,6 +44,7 @@ except ImportError:
 # Check the python version
 check.python_version()
 
+import pandas as pd
 import argparse
 import subprocess
 import os
@@ -1093,8 +1094,8 @@ def main():
         message="Process the sam mapping results ..."
         logger.info(message)
         print("\n"+message)
-            
-        [unaligned_reads_file_fasta, reduced_aligned_reads_file, percent_unaligned, total_reads] = nucleotide.unaligned_reads(
+
+        [unaligned_reads_file_fasta, reduced_aligned_reads_file, percent_unaligned, total_reads, nucleotide_aligned_query_names] = nucleotide.unaligned_reads(
             args.input, alignments, unaligned_reads_store, keep_sam=True, 
             bypass_nucleotide_unaligned_write = args.bypass_nucleotide_unaligned_write)
 
@@ -1125,8 +1126,8 @@ def main():
             logger.info(message)
             print("\n"+message)
             
-            translated_unaligned_reads_file_fastq = translated.unaligned_reads(
-            unaligned_reads_store, args.existing_diamond_alignment_file, alignments)
+            translated_unaligned_reads_file_fastq, translated_aligned_query_names = translated.unaligned_reads(
+            unaligned_reads_store, args.existing_diamond_alignment_file, alignments, nucleotide_aligned_query_names)
 
             # Print out total alignments per bug
             message="Total bugs after translated alignment: " + str(alignments.count_bugs())
@@ -1162,8 +1163,18 @@ def main():
         
         start_time=timestamp_message("alignment post-processing",start_time)
         
+    all_aligned_query_names = nucleotide_aligned_query_names.union(translated_aligned_query_names)
+
+    count_df = pd.read_csv('/pool1/local-storage/bbeardsall/ship_metag/results/trimmed_read_counts.csv')
+    sample_grouped_df = count_df.groupby("sample")['n_seq'].sum().reset_index()
+    sample = args.input.split('/')[-3]
+    total_count = sample_grouped_df[sample_grouped_df['sample'] == sample]['n_seq'].values[0]
+    print('total count: ', total_count)
+
     # Get the number of remaining unaligned reads
-    unaligned_reads_count=unaligned_reads_store.count_reads()
+    # unaligned_reads_count=unaligned_reads_store.count_reads()
+    unaligned_reads_count = total_count - len(all_aligned_query_names)
+    print('Unaligned reads count: ', unaligned_reads_count)
     
     # Clear all of the unaligned reads as they are no longer needed
     unaligned_reads_store.clear()
