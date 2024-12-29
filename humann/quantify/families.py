@@ -45,7 +45,7 @@ def gene_families(alignments,gene_scores,unaligned_reads_count):
     alignments.convert_alignments_to_gene_scores(gene_scores)
         
     # Process the gene id to names mappings
-    gene_names=store.Names(config.gene_family_name_mapping_file)
+    # gene_names=store.Names(config.gene_family_name_mapping_file)
      
     delimiter=config.output_file_column_delimiter
     category_delimiter=config.output_file_category_delimiter     
@@ -63,17 +63,17 @@ def gene_families(alignments,gene_scores,unaligned_reads_count):
     for gene in gene_scores.gene_list_sorted_by_score("all"):
         all_score=gene_scores.get_score("all",gene)
         if all_score>0:
-            gene_name=gene_names.get_name(gene)
+            # gene_name=gene_names.get_name(gene)
             # Print the computation of all bugs for gene family
-            tsv_output.append(gene_name+delimiter+utilities.format_float_to_string(all_score))
+            tsv_output.append(gene+delimiter+utilities.format_float_to_string(all_score))
             # Process and print per bug if selected
-            if not config.remove_stratified_output:
-                # Print scores per bug for family ordered with those with the highest values first
-                scores_by_bug=gene_scores.get_scores_for_gene_by_bug(gene)
-                for bug in utilities.double_sort(scores_by_bug):
-                    if scores_by_bug[bug]>0:
-                        tsv_output.append(gene_name+category_delimiter+bug+delimiter
-                            +utilities.format_float_to_string(scores_by_bug[bug]))       
+            # if not config.remove_stratified_output:
+            #     # Print scores per bug for family ordered with those with the highest values first
+            #     scores_by_bug=gene_scores.get_scores_for_gene_by_bug(gene)
+            #     for bug in utilities.double_sort(scores_by_bug):
+            #         if scores_by_bug[bug]>0:
+            #             tsv_output.append(gene_name+category_delimiter+bug+delimiter
+            #                 +utilities.format_float_to_string(scores_by_bug[bug]))       
         
     if config.output_format=="biom":
         # Open a temp file if a conversion to biom is selected

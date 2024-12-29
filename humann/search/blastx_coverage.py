@@ -15,6 +15,7 @@ import re
 import logging
 import argparse
 from collections import defaultdict
+from typing import List
 
 from humann import config
 from humann import utilities
@@ -23,7 +24,7 @@ from humann import store
 # name global logging instance
 logger=logging.getLogger(__name__)
 
-def blastx_coverage( blast6out, min_coverage, alignments=None, log_messages=None, apply_filter=None, nucleotide = False, query_coverage_threshold=config.translated_query_coverage_threshold, identity_threshold = config.nucleotide_identity_threshold):
+def blastx_coverage(alignment_file_list: List[str], min_coverage, alignments=None, log_messages=None, apply_filter=None, nucleotide = False, query_coverage_threshold=config.translated_query_coverage_threshold, identity_threshold = config.nucleotide_identity_threshold):
     # create alignments instance if none is passed
     if alignments is None:
         alignments=store.Alignments()
@@ -37,24 +38,25 @@ def blastx_coverage( blast6out, min_coverage, alignments=None, log_messages=None
     # track alignments unable to compute coverage
     no_coverage=0
     # parse blast6out file, applying filtering as selected
-    for alignment_info in utilities.get_filtered_translated_alignments(blast6out, alignments, apply_filter=apply_filter, log_filter = log_messages, query_coverage_threshold = query_coverage_threshold, identity_threshold = identity_threshold):
-        ( protein_name, gene_length, queryid, matches, bug, alignment_length,
-          subject_start_index, subject_stop_index) = alignment_info
-          
-        # divide the gene length by 3 to get protein length from nucleotide length
-        if not nucleotide:
-            gene_length = gene_length / 3
-                    
-        # store the protein length
-        protein_lengths[protein_name] = gene_length
-        
-        # add the range of the alignment to the protein hits
-        protein_range=range(subject_start_index, subject_stop_index)
-        if protein_range:
-            # keep track of unique hit positions in this protein
-            protein_hits[protein_name]+="{0}-{1};".format(subject_start_index, subject_stop_index)
-        else:
-            no_coverage+=1
+    for alignment_file in alignment_file_list:
+        for alignment_info in utilities.get_filtered_translated_alignments(alignment_file, alignments, apply_filter=apply_filter, log_filter = log_messages, query_coverage_threshold = query_coverage_threshold, identity_threshold = identity_threshold):
+            ( protein_name, gene_length, queryid, matches, bug, alignment_length,
+            subject_start_index, subject_stop_index) = alignment_info
+            
+            # divide the gene length by 3 to get protein length from nucleotide length
+            if not nucleotide:
+                gene_length = gene_length / 3
+                        
+            # store the protein length
+            protein_lengths[protein_name] = gene_length
+            
+            # add the range of the alignment to the protein hits
+            protein_range=range(subject_start_index, subject_stop_index)
+            if protein_range:
+                # keep track of unique hit positions in this protein
+                protein_hits[protein_name]+="{0}-{1};".format(subject_start_index, subject_stop_index)
+            else:
+                no_coverage+=1
     # track proteins without lengths
     no_length=0
     # compute coverage
@@ -119,7 +121,7 @@ def main():
     args = parse_arguments(sys.argv)
     
     # run coverage computation
-    allowed = blastx_coverage(args.input, args.coverage_threshold)
+    allowed = blastx_coverage([args.input], args.coverage_threshold)
 
     if args.print_protein_list:
         print("\n".join(allowed))
