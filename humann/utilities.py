@@ -1294,6 +1294,8 @@ def get_filtered_translated_alignments(alignment_file_tsv, alignments, apply_fil
     Filter based on identity threshold, evalue, and coverage threshold
     Remove from unaligned reads store if set
     """
+    alignment_file_suffix = alignment_file_tsv.split('.')[-2]
+    read_suffix = '_1' if alignment_file_suffix in {'1', '1_unp'} else '_2'
 
     # if identity threshold is not set, use the config default
     if identity_threshold is None:
@@ -1333,6 +1335,7 @@ def get_filtered_translated_alignments(alignment_file_tsv, alignments, apply_fil
                 identity=0.0
 
             queryid=alignment_info[config.blast_query_index]
+            queryid = queryid + read_suffix
                 
             # try converting the alignment length to a number
             alignment_length=alignment_info[config.blast_aligned_length_index]

@@ -259,11 +259,16 @@ bypass_nucleotide_unaligned_write = False):
     total_reads =  num_mapped + num_unmapped
     match_numbers=re.compile("\d+")
 
+    unaligned_reads_store.set_initial_read_count(total_reads)
+
     if not os.path.exists(reduced_aligned_reads_file):
         start_time = time.time()
         file_handle_write_aligned=open(reduced_aligned_reads_file, "w")
         
-        for info in infile:#, total=total_reads):
+        for info in tqdm.tqdm(infile):#, total=total_reads):
+            query=info.qname
+            read_suffix = "_1" if info.is_read1 else "_2"
+            query = query + read_suffix
             if int(info.flag) & config.sam_unmapped_flag != 0:
                     unaligned_read=True
             else:
@@ -275,7 +280,7 @@ bypass_nucleotide_unaligned_write = False):
                 matches = sum(int(n) for n in match_numbers.findall(md_field))
                 identity = 100.0 * ( matches / ( alignment_length * 1.0 ) )
                 # identity, alignment_length, reference_length=calculate_percent_identity(cigar_string, md_field)
-                query=info.qname
+                query=query
                 # write output to be blastm8-like
                 new_info=[""] * config.blast_total_columns
                 new_info[config.blast_query_index]=query
@@ -291,62 +296,16 @@ bypass_nucleotide_unaligned_write = False):
         file_handle_write_aligned.close()
 
         print(f"first bam iterate time: {time.time() - start_time}")
-    
-
-    # utilities.file_exists_readable(sam_alignment_file)
-    # file_handle_read=open(sam_alignment_file, "rt")
-
-    # file_handle_write_aligned=open(reduced_aligned_reads_file, "w")
-
-    # # read through the file line by line
-    # # generate blast-like output file of alignments
-    # line = file_handle_read.readline()
-    # with tqdm.tqdm(total=total_reads) as pbar:
-    #     while line:
-    #         # ignore headers ^@ 
-    #         unaligned_read=False
-    #         if not re.search("^@",line):
-    #             info=line.split(config.sam_delimiter)
-    #             # check flag to determine if unaligned
-    #             if int(info[config.sam_flag_index]) & config.sam_unmapped_flag != 0:
-    #                 unaligned_read=True
-    #             else:
-    #                 # convert the cigar string and md field to percent identity
-    #                 cigar_string=info[config.sam_cigar_index]
-    #                 md_field=find_md_field(info)
-    #                 identity, alignment_length, reference_length=calculate_percent_identity(cigar_string, md_field)
-                    
-    #                 query=info[config.sam_read_name_index]
-    #                 # write output to be blastm8-like
-    #                 new_info=[""] * config.blast_total_columns
-    #                 new_info[config.blast_query_index]=query
-    #                 new_info[config.blast_reference_index]=info[config.sam_reference_index]
-    #                 new_info[config.blast_subject_start_index]=str(info[config.sam_pos_index])
-    #                 new_info[config.blast_subject_end_index]=str(int(info[config.sam_pos_index])+reference_length)
-    #                 new_info[config.blast_evalue_index]="0"
-    #                 new_info[config.blast_identity_index]=str(identity)
-    #                 new_info[config.blast_aligned_length_index]=str(alignment_length)
-    #                 new_info[config.blast_query_start_index]="0"
-    #                 new_info[config.blast_query_end_index]=str(alignment_length-1)
-    #                 file_handle_write_aligned.write(config.blast_delimiter.join(new_info)+"\n")
-    #             pbar.update()
-    #         line=file_handle_read.readline()
-                   
-    # file_handle_read.close()
-    # file_handle_write_aligned.close()
-
-    # print(f"sam time: {time.time() - start_time}")
 
     start_time = time.time()
 
     # process alignments to determine genes for filtering
-    allowed_genes = blastx_coverage.blastx_coverage(reduced_aligned_reads_file,
+    allowed_genes = blastx_coverage.blastx_coverage([reduced_aligned_reads_file],
         config.nucleotide_subject_coverage_threshold, alignments, log_messages=True, apply_filter=True,
         nucleotide=True, query_coverage_threshold=config.nucleotide_query_coverage_threshold,
         identity_threshold = config.nucleotide_identity_threshold)
 
     print(f"allowed genes time: {time.time() - start_time}")
-
 
     start_time = time.time()
 
@@ -357,16 +316,20 @@ bypass_nucleotide_unaligned_write = False):
     # read through the file line by line
     # capture alignments and also write out unaligned reads for next step in processing
     # line = file_handle_read.readline()
-    query_ids=set()
     no_frames_found_count=0
     small_identity_count=0
     filtered_genes_count=0
     query_coverage_count=0
     infile = pysam.AlignmentFile(sam_alignment_file, "rb")
-    for info in infile:
+    total_reads = infile.mapped + infile.unmapped
+    aligned_query_names = set()
+    for info in tqdm.tqdm(infile, total=total_reads):
+        query=info.qname
+        read_suffix = "_1" if info.is_read1 else "_2"
+        query = query + read_suffix
         unaligned_read=False
         if int(info.flag) & config.sam_unmapped_flag != 0:
-                    unaligned_read=True
+            unaligned_read=True
         else:
             # convert the cigar string and md field to percent identity
             cigar_string=info.cigarstring
@@ -376,14 +339,13 @@ bypass_nucleotide_unaligned_write = False):
             matches = sum(int(n) for n in match_numbers.findall(md_field))
             identity = 100.0 * ( matches / ( alignment_length * 1.0 ) )
             # identity, alignment_length, reference_length=calculate_percent_identity(cigar_string, md_field)
-            query=info.qname
 
             gene_name, gene_length, bug = alignments.process_reference_annotation(
                     info.reference_name)
 
             if not gene_name in allowed_genes:
-                        filtered_genes_count+=1
-                        unaligned_read=True
+                filtered_genes_count+=1
+                unaligned_read=True
             
             query_start_index=0
             query_stop_index=alignment_length-1
@@ -399,103 +361,30 @@ bypass_nucleotide_unaligned_write = False):
                 small_identity_count+=1
                 unaligned_read=True
 
-            if unaligned_read:
-                annotated_sam_read_name=utilities.add_length_annotation(query, info.query_length)
-                if not bypass_nucleotide_unaligned_write:
-                    file_handle_write_unaligned.write(">"+annotated_sam_read_name+"\n")
-                    file_handle_write_unaligned.write(info.query_sequence+"\n")
-                
-                # find the frames for the sequence and write to file
-                if write_picked_frames:
-                    picked_frames=pick_frames.pick_frames(info.query_sequence)
-                    if not picked_frames:
-                        no_frames_found_count+=1
-                    for frame in picked_frames:
-                        if not bypass_nucleotide_unaligned_write:
-                            file_handle_write_unaligned_frames.write(">"+
-                                annotated_sam_read_name+"\n")
-                            file_handle_write_unaligned_frames.write(frame+"\n")
-                
-                # store the unaligned reads data
-                unaligned_reads_store.add(info.query_name, 
-                    info.query_sequence)
+        if unaligned_read:
+            annotated_sam_read_name=utilities.add_length_annotation(query, info.query_length)
+            if not bypass_nucleotide_unaligned_write:
+                file_handle_write_unaligned.write(">"+annotated_sam_read_name+"\n")
+                file_handle_write_unaligned.write(info.query_sequence+"\n")
+            
+            # find the frames for the sequence and write to file
+            if write_picked_frames:
+                picked_frames=pick_frames.pick_frames(info.query_sequence)
+                if not picked_frames:
+                    no_frames_found_count+=1
+                for frame in picked_frames:
+                    if not bypass_nucleotide_unaligned_write:
+                        file_handle_write_unaligned_frames.write(">"+
+                            annotated_sam_read_name+"\n")
+                        file_handle_write_unaligned_frames.write(frame+"\n")
+            
+            # store the unaligned reads data
+            unaligned_reads_store.add(query, 
+                info.query_sequence)
+        else:
+            aligned_query_names.add(query)
 
     print(f"second bam iterate time: {time.time() - start_time}")
-
-
-
-
-    # with tqdm.tqdm() as pbar:
-    #     while line:
-    #         # ignore headers ^@ 
-    #         unaligned_read=False
-    #         if not re.search("^@",line):
-    #             info=line.split(config.sam_delimiter)
-    #             query_ids.add(info[config.blast_query_index])
-    #             # check flag to determine if unaligned
-    #             if int(info[config.sam_flag_index]) & config.sam_unmapped_flag != 0:
-    #                 unaligned_read=True
-    #             else:
-    #                 # convert the cigar string and md field to percent identity
-    #                 cigar_string=info[config.sam_cigar_index]
-    #                 md_field=find_md_field(info)
-    #                 identity, alignment_length, reference_length=calculate_percent_identity(cigar_string, md_field)
-
-    #                 # only store alignments with identity greater than threshold
-    #                 # and with genes included in the filtered list
-    #                 query=info[config.sam_read_name_index]
-
-    #                 gene_name, gene_length, bug = alignments.process_reference_annotation(
-    #                 info[config.sam_reference_index])
-    #                 if gene_name == "TARA_X000000368_G_C22366207_1_gene422769":
-    #                     print('match!')
-
-    #                 if not gene_name in allowed_genes:
-    #                     filtered_genes_count+=1
-    #                     unaligned_read=True
-
-    #                 query_start_index=0
-    #                 query_stop_index=alignment_length-1
-    #                 if utilities.filter_based_on_query_coverage(alignment_length, query_start_index, query_stop_index, config.nucleotide_query_coverage_threshold):
-    #                     query_coverage_count+=1
-    #                     unaligned_read=True
-
-    #                 if identity > config.identity_threshold:
-    #                     matches=identity/100.0*alignment_length
-    #                     if not unaligned_read:
-    #                         alignments.add_annotated(query,matches,info[config.sam_reference_index],
-    #                             alignment_length)
-    #                 else:
-    #                     small_identity_count+=1
-    #                     unaligned_read=True
-
-    #             if unaligned_read:
-    #                 annotated_sam_read_name=utilities.add_length_annotation(info[config.sam_read_name_index],
-    #                                                                     len(info[config.sam_read_index]))
-    #                 if not bypass_nucleotide_unaligned_write:
-    #                     file_handle_write_unaligned.write(">"+annotated_sam_read_name+"\n")
-    #                     file_handle_write_unaligned.write(info[config.sam_read_index]+"\n")
-                    
-    #                 # find the frames for the sequence and write to file
-    #                 if write_picked_frames:
-    #                     picked_frames=pick_frames.pick_frames(info[config.sam_read_index])
-    #                     if not picked_frames:
-    #                         no_frames_found_count+=1
-    #                     for frame in picked_frames:
-    #                         if not bypass_nucleotide_unaligned_write:
-    #                             file_handle_write_unaligned_frames.write(">"+
-    #                                 annotated_sam_read_name+"\n")
-    #                             file_handle_write_unaligned_frames.write(frame+"\n")
-                    
-    #                 # store the unaligned reads data
-    #                 unaligned_reads_store.add(info[config.sam_read_name_index], 
-    #                     info[config.sam_read_index])
-    #             pbar.update()
-                        
-    #         line=file_handle_read.readline()
-
-    # print(f"sam loop 2 time: {time.time() - start_time}")
-    # start_time = time.time()
    
     if write_picked_frames:
         logger.debug("Total sequences without frames found: " + str(no_frames_found_count))
@@ -510,7 +399,7 @@ bypass_nucleotide_unaligned_write = False):
     file_handle_write_unaligned.close()
     
     # set the total number of queries
-    unaligned_reads_store.set_initial_read_count(len(query_ids))
+    # unaligned_reads_store.set_initial_read_count(len(query_ids))
     
     # set the unaligned reads file to read sequences from
     unaligned_reads_store.set_file(unaligned_reads_file_fasta)
@@ -529,7 +418,7 @@ bypass_nucleotide_unaligned_write = False):
     percent_unaligned = num_unmapped / total_reads * 100
 
     # return the picked frames file if written
-    return_list=[unaligned_reads_file_fasta, reduced_aligned_reads_file, percent_unaligned, total_reads]
+    return_list=[unaligned_reads_file_fasta, reduced_aligned_reads_file, percent_unaligned, total_reads, aligned_query_names]
     if write_picked_frames:
         return_list=[unaligned_reads_file_picked_frames_fasta, reduced_aligned_reads_file]
 
